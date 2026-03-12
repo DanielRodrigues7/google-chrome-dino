@@ -1,12 +1,5 @@
-- name: Docker build & push para ACR
-  env:
-    ACR_LOGIN: ${{ steps.tfout.outputs.acr }}
-    TAG: ${{ github.sha }}
-  run: |
-    az acr login --name ${ACR_LOGIN%%.*}
-    docker buildx create --use --name dino || true
-    docker buildx build \
-      --platform linux/amd64 \
-      -f www/Dockerfile \        # <- Dockerfile nessa pasta
-      -t "$
-
+FROM nginx:alpine
+RUN rm -rf /usr/share/nginx/html/*
+COPY ./www/ /usr/share/nginx/html/
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
