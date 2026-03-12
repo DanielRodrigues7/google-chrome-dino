@@ -29,8 +29,7 @@ resource "azurerm_container_registry" "acr" {
 }
 
 #############################################
-# Web App (Linux) usando Container do ACR
-# COMPATÍVEL COM AZURERM PROVIDER 4.x
+# Web App Linux rodando Docker (provider 4.x)
 #############################################
 resource "azurerm_linux_web_app" "app" {
   name                = "${var.prefix}-web"
@@ -44,20 +43,18 @@ resource "azurerm_linux_web_app" "app" {
   }
 
   site_config {
-    container_registry_use_managed_identity = true
-
-    container_settings {
-      image_name = "${azurerm_container_registry.acr.login_server}/${var.image_name}:${var.image_tag}"
-    }
+    linux_fx_version = "DOCKER|${azurerm_container_registry.acr.login_server}/${var.image_name}:${var.image_tag}"
+    always_on        = true
   }
 
   app_settings = {
-    WEBSITES_PORT = "80"
+    DOCKER_REGISTRY_SERVER_URL = "https://${azurerm_container_registry.acr.login_server}"
+    WEBSITES_PORT              = "80"
   }
 }
 
 #############################################
-# Role Assignment - WebApp pode puxar imagem do ACR
+# Permitir WebApp puxar a imagem do ACR
 #############################################
 resource "azurerm_role_assignment" "acr_pull_for_app" {
   scope                = azurerm_container_registry.acr.id
