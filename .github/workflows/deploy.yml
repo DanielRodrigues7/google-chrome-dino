@@ -1,0 +1,95 @@
+name: dino-ci-cd
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  # Ajuste estes valores
+  PREFIX: dino
+  LOCATION: brazilsouth
+
+  # Backend do Terraform (use seu RG do Storage)
+  TF_STATE_RG: "<<RG_DO_STORAGE>>"
+  TF_STATE_ACCOUNT: "sttfdanieldzhzk9"
+  TF_STATE_CONTAINER: "tfstate"
+  TF_STATE_KEY: "dino/infra.tfstate"
+
+  IMAGE_NAME: dino-game
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id:       ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id:       ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init (backend remoto)
+        working-directory: infra/terraform
+        run: |
+          terraform init \
+            -backend-config="resource_group_name=${{ env.TF_STATE_RG }}" \
+            -backend-config="storage_account_name=${{ env.TF_STATE_ACCOUNT }}" \
+            -backend-config="container_name=${{ env.TF_STATE_CONTAINER }}" \
+            -backend-config="key=${{ env.TF_STATE_KEY }}" \
+            -backend-config="use_azuread_auth=true"
+      # Backend azurerm com AAD é o modelo recomendado para state remoto. [1](https://learn.microsoft.com/en-us/azure/static-web-apps/apis-app-service)
+
+      - name: Terraform Apply (infra inicial - tag bootstrap)
+        working-directory: infra/terraform
+        env:
+          TF_VAR_prefix:      ${{ env.PREFIX }}
+          TF_VAR_location:    ${{ env.LOCATION }}
+          TF_VAR_image_name:  ${{ env.IMAGE_NAME }}
+          TF_VAR_image_tag:   "bootstrap"
+        run: terraform apply -auto-approve
+
+      - name: Ler outputs (ACR e URL do Web App)
+        id: tfout
+        working-directory: infra/terraform
+        run: |
+          echo "acr=$(terraform output -raw acr_login_server)" >> $GITHUB_OUTPUT
+          echo "web=$(terraform output -raw webapp_url)" >> $GITHUB_OUTPUT
+
+      - name: Docker build & push para ACR
+        env:
+          ACR_LOGIN: ${{ steps.tfout.outputs.acr }}
+          TAG: ${{ github.sha }}
+        run: |
+          # login no ACR usando a credencial OIDC atual
+          az acr login --name ${ACR_LOGIN%%.*}
+          docker buildx create --use --name dino || true
+          docker buildx build \
+            --platform linux/amd64 \
+            -t "$ACR_LOGIN/${{ env.IMAGE_NAME }}:$TAG" \
+            --push \
+            .
+
+      - name: Terraform Apply (atualizar tag para a nova imagem)
+        working-directory: infra/terraform
+        env:
+          TF_VAR_prefix:      ${{ env.PREFIX }}
+          TF_VAR_location:    ${{ env.LOCATION }}
+          TF_VAR_image_name:  ${{ env.IMAGE_NAME }}
+          TF_VAR_image_tag:   ${{ github.sha }}
+        run: terraform apply -auto-approve
+
+      - name: URL pública do Web App
+        run: echo "https://${{ steps.tfout.outputs.web }}"
+``
