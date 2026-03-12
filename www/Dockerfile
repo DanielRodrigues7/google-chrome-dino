@@ -7,5 +7,6 @@
     docker buildx create --use --name dino || true
     docker buildx build \
       --platform linux/amd64 \
-      -f www/assets/Dockerfile \        # <- Dockerfile nessa pasta
+      -f www/Dockerfile \        # <- Dockerfile nessa pasta
       -t "$
+
