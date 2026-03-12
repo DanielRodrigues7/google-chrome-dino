@@ -43,21 +43,21 @@ resource "azurerm_linux_web_app" "app" {
   }
 
   site_config {
-    linux_fx_version = "DOCKER|${azurerm_container_registry.acr.login_server}/${var.image_name}:${var.image_tag}"
-    always_on        = true
+    application_stack {
+      docker_image     = "${azurerm_container_registry.acr.login_server}/${var.image_name}"
+      docker_image_tag = var.image_tag
+    }
   }
 
   app_settings = {
-    DOCKER_REGISTRY_SERVER_URL = "https://${azurerm_container_registry.acr.login_server}"
-    WEBSITES_PORT              = "80"
+    WEBSITES_PORT = "80"
   }
 }
 
 #############################################
-# Permitir WebApp puxar a imagem do ACR
+# Permitir o Web App puxar imagem do ACR
 #############################################
 resource "azurerm_role_assignment" "acr_pull_for_app" {
   scope                = azurerm_container_registry.acr.id
   role_definition_name = "AcrPull"
-  principal_id         = azurerm_linux_web_app.app.identity[0].principal_id
-}
+  principal_id         = azur
