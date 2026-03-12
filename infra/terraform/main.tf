@@ -47,6 +47,8 @@ resource "azurerm_linux_web_app" "app" {
       docker_image     = "${azurerm_container_registry.acr.login_server}/${var.image_name}"
       docker_image_tag = var.image_tag
     }
+
+    always_on = true
   }
 
   app_settings = {
@@ -55,9 +57,10 @@ resource "azurerm_linux_web_app" "app" {
 }
 
 #############################################
-# Permitir o Web App puxar imagem do ACR
+# Permitir o Web App puxar a imagem do ACR
 #############################################
 resource "azurerm_role_assignment" "acr_pull_for_app" {
   scope                = azurerm_container_registry.acr.id
   role_definition_name = "AcrPull"
-  principal_id         = azur
+  principal_id         = azurerm_linux_web_app.app.identity[0].principal_id
+}
