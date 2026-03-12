@@ -15,7 +15,7 @@ env:
   LOCATION: brazilsouth
 
   # Backend do Terraform (use seu RG do Storage)
-  TF_STATE_RG: "<<RG_DO_STORAGE>>"
+  TF_STATE_RG: "rg-tfstate-lab"
   TF_STATE_ACCOUNT: "sttfdanieldzhzk9"
   TF_STATE_CONTAINER: "tfstate"
   TF_STATE_KEY: "dino/infra.tfstate"
@@ -92,4 +92,5 @@ jobs:
 
       - name: URL pública do Web App
         run: echo "https://${{ steps.tfout.outputs.web }}"
+
 ``
